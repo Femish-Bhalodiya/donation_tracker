@@ -92,7 +92,8 @@ module.exports = function (app) {
             members.forEach((member, index) => {
                 const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '▫️';
                 const totalDonations = Object.values(member.total_donations).reduce((sum, val) => sum + val, 0);
-                message += `${medal} *${index + 1}.* ${member.name} - ${formatNumber(totalDonations)} donations\n`;
+                const escapedName = escapeMarkdown(member.name);
+                message += `${medal} *${index + 1}.* ${escapedName} - ${formatNumber(totalDonations)} donations\n`;
             });
             message += `\n_Last updated: ${new Date().toLocaleString()}_`;
 
@@ -199,7 +200,7 @@ module.exports = function (app) {
     });
 
     // Set webhook for Telegram bot
-    const webhookUrl = process.env.WEBHOOK_URL || "https://donation-tracker-eyp4.onrender.com"
+    const webhookUrl = process.env.WEBHOOK_URL || "https://donation-tracker-eyp4.onrender.com/webhook"
     bot.setWebHook(webhookUrl).then(() => {
         console.log(`Webhook set to: ${webhookUrl}`);
     }).catch(error => {
