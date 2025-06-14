@@ -189,7 +189,7 @@ module.exports = function (app) {
             `/clanlist - Show donations list by clans\n` +
             `/help - Show this help message\n\n` +
             `_Note: Commands can only be used once every 30 seconds._`;
-        
+
         bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
     });
 
@@ -199,7 +199,7 @@ module.exports = function (app) {
     });
 
     // Set webhook for Telegram bot
-    const webhookUrl = process.env.WEBHOOK_URL ;
+    const webhookUrl = process.env.WEBHOOK_URL || "https://donation-tracker-eyp4.onrender.com"
     bot.setWebHook(webhookUrl).then(() => {
         console.log(`Webhook set to: ${webhookUrl}`);
     }).catch(error => {
