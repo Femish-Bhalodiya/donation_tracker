@@ -1,50 +1,12 @@
 const cron = require('node-cron');
 const { fetchAllClanMembers } = require('./cocApi');
 const { processClanMembers } = require('./processMembers');
-const ClanMember = require('../models/ClanMember');
 
 // Configuration
 const FETCH_INTERVAL = '*/10 * * * * *'; // Every 10 seconds
-const RESET_INTERVAL = '0 0 1 * *'; // First day of every month at midnight
-const PAUSE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
-
-let isFetchingPaused = false;
-
-// Function to reset all donations
-async function resetDonations() {
-    try {
-        console.log('Starting monthly donation reset...');
-        const result = await ClanMember.update(
-            { 
-                total_donations: {},
-                last_fetched_donations: {}
-            },
-            { where: {} }
-        );
-        console.log(`Reset completed. Updated ${result[0]} records.`);
-    } catch (error) {
-        console.error('Error resetting donations:', error);
-    }
-}
-
-// Function to pause fetching for 1 hour
-function pauseFetching() {
-    isFetchingPaused = true;
-    console.log('Fetching paused for 1 hour');
-    
-    setTimeout(() => {
-        isFetchingPaused = false;
-        console.log('Fetching resumed');
-    }, PAUSE_DURATION);
-}
 
 // Function to fetch and process clan members
 async function fetchAndProcess() {
-    if (isFetchingPaused) {
-        console.log('Processing is paused');
-        return;
-    }
-
     try {
         console.log('Starting fetch and process cycle...');
         const members = await fetchAllClanMembers();
@@ -58,18 +20,9 @@ async function fetchAndProcess() {
     }
 }
 
-// Schedule donation reset (first day of every month at midnight)
-cron.schedule(RESET_INTERVAL, async () => {
-    console.log('Running monthly reset...');
-    await resetDonations();
-    pauseFetching();
-});
-
-// Schedule data fetching (every 10 seconds when not paused)
+// Schedule data fetching (every 10 seconds)
 cron.schedule(FETCH_INTERVAL, async () => {
-    if (!isFetchingPaused) {
-        await fetchAndProcess();
-    }
+    await fetchAndProcess();
 });
 
 // Initial fetch
@@ -81,7 +34,5 @@ fetchAndProcess().catch(error => {
 console.log('Scheduler started!');
 
 module.exports = {
-    fetchAndProcess,
-    resetDonations,
-    pauseFetching
+    fetchAndProcess
 }; 
