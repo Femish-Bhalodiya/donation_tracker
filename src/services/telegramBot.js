@@ -1,8 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
-const { processClanMembers } = require('../services/processMembers');
 const ClanMember = require('../models/ClanMember');
 const { CLAN_TAGS } = require('../config/clans');
-const sequelize = require('sequelize');
 
 // Configuration
 const token = process.env.TEL_TOKEN;
@@ -11,9 +9,6 @@ const COMMAND_COOLDOWN = process.env.TIMELIMIT;
 
 // Create a bot instance with webhook for production
 const bot = new TelegramBot(token);
-
-// List of allowed Telegram user IDs
-const ALLOWED_USERS = new Set([]);
 
 // Track last command usage for rate limiting
 const lastCommandUsage = new Map();
@@ -31,7 +26,8 @@ bot.setMyCommands(commands)
     .catch(error => console.error('Error setting bot commands:', error));
 
 function escapeMarkdown(text) {
-    return text.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
+    if (!text || typeof text !== 'string') return '';
+    return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
 }
 
 function formatNumber(num) {
@@ -49,6 +45,11 @@ function isRateLimited(userId) {
 // Update the last command usage time for a user
 function updateLastCommandUsage(userId) {
     lastCommandUsage.set(userId, Date.now());
+}
+
+function ensurePositiveInteger(value, defaultValue = 0) {
+    const num = parseInt(value);
+    return isNaN(num) || num < 0 ? defaultValue : num;
 }
 
 module.exports = function (app) {
@@ -79,21 +80,31 @@ module.exports = function (app) {
         try {
             await bot.sendChatAction(chatId, 'typing');
 
-            const members = await ClanMember.findAll({
-                order: [[sequelize.literal('(SELECT SUM(value::integer) FROM jsonb_each_text(total_donations))'), 'DESC']]
-            });
+            const members = await ClanMember.find().lean();
 
-            if (members.length === 0) {
+            if (!members || members.length === 0) {
                 bot.sendMessage(chatId, 'No donation data available yet.');
                 return;
             }
 
+            const membersWithTotal = members.map(member => {
+                const totalDonations = Object.values(member.total_donations || {})
+                    .reduce((sum, val) => sum + ensurePositiveInteger(val, 0), 0);
+                return { ...member, totalDonations };
+            }).filter(member => member.totalDonations > 0);
+
+            if (membersWithTotal.length === 0) {
+                bot.sendMessage(chatId, 'No donation data available yet.');
+                return;
+            }
+
+            membersWithTotal.sort((a, b) => b.totalDonations - a.totalDonations);
+
             let message = '🏆 *Top Donators This Season* 🏆\n\n';
-            members.forEach((member, index) => {
+            membersWithTotal.forEach((member, index) => {
                 const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '▫️';
-                const totalDonations = Object.values(member.total_donations).reduce((sum, val) => sum + val, 0);
                 const escapedName = escapeMarkdown(member.name);
-                message += `${medal} *${index + 1}.* ${escapedName} - ${formatNumber(totalDonations)} donations\n`;
+                message += `${medal} *${index + 1}.* ${escapedName} - ${formatNumber(member.totalDonations)}\n`;
             });
             message += `\n_Last updated: ${new Date().toLocaleString()}_`;
 
@@ -120,8 +131,8 @@ module.exports = function (app) {
         try {
             await bot.sendChatAction(chatId, 'typing');
 
-            const members = await ClanMember.findAll();
-            if (members.length === 0) {
+            const members = await ClanMember.find().lean();
+            if (!members || members.length === 0) {
                 bot.sendMessage(chatId, 'No donation data available yet.');
                 return;
             }
@@ -133,20 +144,25 @@ module.exports = function (app) {
             });
 
             members.forEach(member => {
-                Object.entries(member.total_donations).forEach(([clanTag, donations]) => {
-                    if (donations > 0) {
-                        clanDonations[clanTag].push({
-                            name: member.name,
-                            donations: parseInt(donations)
-                        });
-                    }
-                });
+                if (member.total_donations && typeof member.total_donations === 'object') {
+                    Object.entries(member.total_donations).forEach(([clanTag, donations]) => {
+                        const safeDonations = ensurePositiveInteger(donations, 0);
+                        if (safeDonations > 0) {
+                            clanDonations[clanTag].push({
+                                name: member.name,
+                                donations: safeDonations
+                            });
+                        }
+                    });
+                }
             });
 
-            // Format message for each clan
             let message = '📊 *Donations by Clan* 📊\n\n';
+            let hasData = false;
+
             for (const [clanTag, members] of Object.entries(clanDonations)) {
                 if (members.length > 0) {
+                    hasData = true;
                     // Escape clan tag for Markdown
                     message += `*${escapeMarkdown(clanTag)}*\n`;
                     members
@@ -160,6 +176,12 @@ module.exports = function (app) {
                     message += '\n';
                 }
             }
+
+            if (!hasData) {
+                bot.sendMessage(chatId, 'No donation data available yet.');
+                return;
+            }
+
             message += `_Last updated: ${new Date().toLocaleString()}_`;
 
             // Try sending with Markdown first, if it fails, send as plain text

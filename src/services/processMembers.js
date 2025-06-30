@@ -1,5 +1,11 @@
 const ClanMember = require('../models/ClanMember');
 
+// Helper function to ensure positive integer
+function ensurePositiveInteger(value, defaultValue = 0) {
+    const num = parseInt(value);
+    return isNaN(num) || num < 0 ? defaultValue : num;
+}
+
 async function processClanMembers(members) {
     if (!members || members.length === 0) {
         console.log('No members to process');
@@ -8,42 +14,44 @@ async function processClanMembers(members) {
 
     for (const member of members) {
         try {
-            let clanMember = await ClanMember.findByPk(member.tag);
-            const { currentClan, currentDonation } = member;
+            const currentDonation = ensurePositiveInteger(member.currentDonation, 0);
+            let clanMember = await ClanMember.findOne({ tag: member.tag });
 
             if (!clanMember) {
-                // New member - initialize with current clan's donation
-                await ClanMember.create({
+                const newMember = new ClanMember({
                     tag: member.tag,
                     name: member.name,
-                    total_donations: { [currentClan]: currentDonation },
-                    last_fetched_donations: { [currentClan]: currentDonation }
+                    total_donations: new Map([[member.currentClan, currentDonation]]),
+                    last_fetched_donations: new Map([[member.currentClan, currentDonation]])
                 });
-                console.log(`Created new member: ${member.name} in clan ${currentClan}`);
+                await newMember.save();
+                console.log(`Created new member: ${member.name} in clan ${member.currentClan} with ${currentDonation} donations`);
             } else {
-                // Update existing member
-                const lastFetched = clanMember.last_fetched_donations[currentClan] || 0;
-                const newTotalDonations = { ...clanMember.total_donations };
+                const lastFetched = ensurePositiveInteger(clanMember.last_fetched_donations.get(member.currentClan), 0);
+                const currentTotal = ensurePositiveInteger(clanMember.total_donations.get(member.currentClan), 0);
+
+                let newTotalDonations = currentTotal;
+                let hasChanges = false;
 
                 if (lastFetched > currentDonation) {
-                    // Member left and rejoined
-                    newTotalDonations[currentClan] = (newTotalDonations[currentClan] || 0) + currentDonation;
-                    console.log(`Member ${member.name} rejoined clan ${currentClan}`);
+                    // Member left and rejoined - add current donation to total
+                    newTotalDonations = currentTotal + currentDonation;
+                    hasChanges = true;
                 } else if (lastFetched < currentDonation) {
-                    // Member donated more
+                    // Member donated more - add only the difference
                     const difference = currentDonation - lastFetched;
-                    newTotalDonations[currentClan] = (newTotalDonations[currentClan] || 0) + difference;
-                    console.log(`Member ${member.name} donated ${difference} more in clan ${currentClan}`);
+                    newTotalDonations = currentTotal + difference;
+                    hasChanges = true;
                 }
 
-                // Update last_fetched_donations with current clan's donation
-                const updatedLastFetched = { ...clanMember.last_fetched_donations };
-                updatedLastFetched[currentClan] = currentDonation;
+                if (hasChanges) {
+                    clanMember.total_donations.set(member.currentClan, newTotalDonations);
+                    clanMember.last_fetched_donations.set(member.currentClan, currentDonation);
 
-                await clanMember.update({
-                    total_donations: newTotalDonations,
-                    last_fetched_donations: updatedLastFetched
-                });
+                    await clanMember.save();
+
+                    console.log(`Updated donations for ${member.name} in clan ${member.currentClan}: ${newTotalDonations}`);
+                }
             }
         } catch (error) {
             console.error(`Error processing member ${member.name}:`, error);

@@ -15,9 +15,14 @@ const cocApi = axios.create({
 
 async function fetchClanMembers(clanTag) {
   try {
+    if (!clanTag || !clanTag.startsWith('#')) {
+      console.error('Invalid clan tag format:', clanTag);
+      return null;
+    }
+
     const encodedClanTag = clanTag.replace('#', '%23');
     const response = await cocApi.get(`/clans/${encodedClanTag}/members`);
-    
+
     if (response.status === 200) {
       return response.data.items;
     } else {
@@ -34,7 +39,7 @@ async function fetchClanMembers(clanTag) {
 
 async function fetchAllClanMembers() {
   const allMembers = new Map();
-  
+
   // Fetch all clans in parallel
   const clanPromises = CLAN_TAGS.map(async (clanTag) => {
     try {

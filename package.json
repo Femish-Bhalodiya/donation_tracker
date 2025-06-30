@@ -11,10 +11,9 @@
     "axios": "^1.6.7",
     "dotenv": "^16.4.1",
     "express": "^5.1.0",
+    "mongoose": "^8.0.3",
     "node-cron": "^3.0.3",
-    "node-telegram-bot-api": "^0.66.0",
-    "pg": "^8.15.6",
-    "sequelize": "^6.37.1"
+    "node-telegram-bot-api": "^0.66.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"
