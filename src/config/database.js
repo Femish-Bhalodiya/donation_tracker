@@ -3,8 +3,10 @@ require('dotenv').config();
 
 const connectDB = async () => {
   try {
+    const uri = process.env.DATABASE_URL;
+    const dbName = process.env.DB_NAME;
     const connectionOptions = {
-      dbName: process.env.DB_NAME,
+      dbName: dbName,
       useNewUrlParser: true,
       useUnifiedTopology: true,
       serverSelectionTimeoutMS: 30000,
@@ -12,7 +14,7 @@ const connectDB = async () => {
       family: 4
     };
 
-    const conn = await mongoose.connect(process.env.MONGODB_URI, connectionOptions);
+    const conn = await mongoose.connect(uri, connectionOptions);
 
     console.log('✅ MongoDB connected successfully');
     return conn;
