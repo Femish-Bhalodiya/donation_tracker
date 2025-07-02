@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const { fetchAllClanMembers } = require('./cocApi');
 const { processClanMembers } = require('./processMembers');
 
-const FETCH_INTERVAL = '*/10 * * * * *'; // Every 10 seconds
+const FETCH_INTERVAL = '*/20 * * * * *'; // Every 10 seconds
 
 async function fetchAndProcess() {
     try {
