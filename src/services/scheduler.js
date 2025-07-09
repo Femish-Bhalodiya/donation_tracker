@@ -2,11 +2,19 @@ const cron = require('node-cron');
 const { fetchAllClanMembers } = require('./cocApi');
 const { processClanMembers } = require('./processMembers');
 
-const FETCH_INTERVAL = '*/20 * * * * *'; // Every 10 seconds
+const FETCH_INTERVAL = '*/20 * * * * *'; // Every 20 seconds
+
+let isRunning = false; // Lock flag
 
 async function fetchAndProcess() {
+    if (isRunning) {
+        return;
+    }
+
+    isRunning = true;
+    console.log('Starting fetch and process cycle...');
+
     try {
-        console.log('Starting fetch and process cycle...');
         const members = await fetchAllClanMembers();
         if (members && members.length > 0) {
             await processClanMembers(members);
@@ -14,6 +22,8 @@ async function fetchAndProcess() {
         console.log('Fetch and process cycle completed');
     } catch (error) {
         console.error('Error in fetchAndProcess:', error);
+    } finally {
+        isRunning = false;
     }
 }
 
@@ -27,4 +37,4 @@ function startScheduler() {
 module.exports = {
     fetchAndProcess,
     startScheduler
-}; 
+};
