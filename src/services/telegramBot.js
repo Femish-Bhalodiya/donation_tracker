@@ -222,7 +222,7 @@ module.exports = function (app) {
     });
 
     // Set webhook for Telegram bot
-    const webhookUrl = process.env.WEBHOOK_URL || "https://donation-tracker-eyp4.onrender.com/webhook"
+    const webhookUrl = process.env.WEBHOOK_URL || "https://donation-tracker-1.onrender.com/webhook"
     bot.setWebHook(webhookUrl).then(() => {
         console.log(`Webhook set to: ${webhookUrl}`);
     }).catch(error => {

@@ -7,8 +7,6 @@ const connectDB = async () => {
     const dbName = process.env.DB_NAME;
     const connectionOptions = {
       dbName: dbName,
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 45000,
       family: 4
